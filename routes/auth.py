@@ -14,6 +14,9 @@ def register():
     # Comprobamos si el email ya existe
     if Usuario.query.filter_by(email=data.get('email')).first():
         return jsonify({"error": "El email ya está registrado"}), 400
+    
+    if Usuario.query.filter_by(username=data.get('username')).first():
+        return jsonify({"error": "El username ya está registrado"}), 400
 
     # Encriptamos la contraseña
     hashed_password = bcrypt.generate_password_hash(data.get('password')).decode('utf-8')
@@ -21,6 +24,8 @@ def register():
     # Creamos el nuevo usuario
     nuevo_usuario = Usuario(
         nombre=data.get('nombre'),
+        apellido=data.get('apellido'),
+        username=data.get('username'),
         email=data.get('email'),
         password=hashed_password,
         rol=data.get('rol', 'User') # Por defecto será 'User' si no nos envían nada
