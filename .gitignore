@@ -11,3 +11,15 @@ __pycache__/
 
 # Archivos de base de datos locales (si usáramos SQLite)
 *.db
+
+# Ignorar la carpeta de uploads
+uploads/
+
+# Ignorar archivos de configuración específicos del entorno
+config.py
+
+# Ignorar archivos de log
+*.log
+
+# Ignorar archivos de migración (opcional, si quieres mantenerlos fuera del control de versiones)
+migrations/

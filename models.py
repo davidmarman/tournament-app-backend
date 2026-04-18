@@ -42,6 +42,7 @@ class Usuario(db.Model):
     email = db.Column(db.String(150), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     rol = db.Column(db.Enum('Admin', 'User', name='rol_types'), default='User', nullable=False)
+    imagen_perfil = db.Column(db.String(255), nullable=True, default='default.png')
 
     # Relaciones para acceder fácilmente a sus datos desde Python
     equipos = db.relationship('Pertenece', backref='usuario', lazy=True)
