@@ -24,6 +24,10 @@ def create_app():
     from routes.auth import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
+    # Registro del blueprint de partidos
+    from routes.partidos import partidos_bp
+    app.register_blueprint(partidos_bp, url_prefix='/api/partidos')
+
 
     # Ruta de prueba para verificar que el servidor levanta
     @app.route('/')

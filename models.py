@@ -1,5 +1,5 @@
 from extensions import db
-from datetime import date
+from datetime import date, datetime
 
 # =====================================================================
 # 1. TABLAS INTERMEDIAS (Relaciones con datos adicionales)
@@ -77,6 +77,7 @@ class Partido(db.Model):
     id_visitante = db.Column(db.Integer, db.ForeignKey('equipo.id_equipo'), nullable=False)
     goles_local = db.Column(db.Integer, default=0)
     goles_visit = db.Column(db.Integer, default=0)
+    fecha = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     estado = db.Column(db.Enum('Pendiente', 'Fin', name='estado_partido'), default='Pendiente', nullable=False)
 
     # Para poder saber quién es el local y quién el visitante sin confundir a SQLAlchemy
