@@ -13,11 +13,15 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config["JWT_SECRET_KEY"] = "super-secreta-clave-para-torneos" # Cambiaremos esto luego
 
-    # Configuración para subir imágenes 
-    # Donde se guardarán las imágenes de perfil
-    UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads/perfiles')
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True) # Asegura que la carpeta exista
-    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    # 1. RUTAS DE CARPETAS
+    app.config['UPLOAD_FOLDER_PERFILES'] = os.path.join(os.getcwd(), 'uploads/perfiles')
+    app.config['UPLOAD_FOLDER_EQUIPOS'] = os.path.join(os.getcwd(), 'uploads/equipos')
+    app.config['UPLOAD_FOLDER_TORNEOS'] = os.path.join(os.getcwd(), 'uploads/torneos') # Para uso general, si quieres
+
+    # Aseguramos que existan
+    os.makedirs(app.config['UPLOAD_FOLDER_PERFILES'], exist_ok=True)
+    os.makedirs(app.config['UPLOAD_FOLDER_EQUIPOS'], exist_ok=True)
+    os.makedirs(app.config['UPLOAD_FOLDER_TORNEOS'], exist_ok=True)
 
     # Inicializamos extensiones con la app
     db.init_app(app)
@@ -34,10 +38,28 @@ def create_app():
     from routes.partidos import partidos_bp
     app.register_blueprint(partidos_bp, url_prefix='/api/partidos')
 
+    # Registro del blueprint de usuario
+    from routes.usuario import usuario_bp
+    app.register_blueprint(usuario_bp, url_prefix='/api/usuario')
+
+    # Registro del blueprint de equipos
+    from routes.equipos import equipos_bp
+    app.register_blueprint(equipos_bp, url_prefix='/api/equipos')
+
     # Ruta para servir imágenes de perfil
     @app.route('/uploads/perfiles/<filename>')
     def obtener_perfil_image(filename):
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        return send_from_directory(app.config['UPLOAD_FOLDER_PERFILES'], filename)
+    
+    # Ruta para servir logos de equipos
+    @app.route('/uploads/equipos/<filename>')
+    def obtener_logo_equipo(filename):
+        return send_from_directory(app.config['UPLOAD_FOLDER_EQUIPOS'], filename)
+
+    # Ruta para servir logos de torneos
+    @app.route('/uploads/torneos/<filename>')
+    def obtener_logo_torneo(filename):
+        return send_from_directory(app.config['UPLOAD_FOLDER_TORNEOS'], filename)
 
     # Ruta de prueba para verificar que el servidor levanta
     @app.route('/')

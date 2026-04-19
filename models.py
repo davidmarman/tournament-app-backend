@@ -11,6 +11,17 @@ class Pertenece(db.Model):
     id_equipo = db.Column(db.Integer, db.ForeignKey('equipo.id_equipo'), primary_key=True)
     fecha_alta = db.Column(db.Date, default=date.today)
 
+class Inscripcion(db.Model):
+    __tablename__ = 'inscripcion'
+    id_inscripcion = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    id_equipo = db.Column(db.Integer, db.ForeignKey('equipo.id_equipo'), nullable=False)
+    id_torneo = db.Column(db.Integer, db.ForeignKey('torneo.id_torneo'), nullable=False)
+    fecha_inscripcion = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relaciones para navegar fácilmente
+    equipo = db.relationship('Equipo', backref=db.backref('inscripciones', lazy=True))
+    torneo = db.relationship('Torneo', backref=db.backref('inscripciones', lazy=True))
+
 class Clasificacion(db.Model):
     __tablename__ = 'clasificacion'
     id_torneo = db.Column(db.Integer, db.ForeignKey('torneo.id_torneo'), primary_key=True)
@@ -53,6 +64,7 @@ class Equipo(db.Model):
     id_equipo = db.Column(db.Integer, primary_key=True, autoincrement=True)
     nombre = db.Column(db.String(100), nullable=False)
     url_logo = db.Column(db.String(255), nullable=True)
+    id_capitan = db.Column(db.Integer, db.ForeignKey('usuario.id_usuario'), nullable=False)
 
     # Relaciones
     jugadores = db.relationship('Pertenece', backref='equipo', lazy=True)
@@ -64,6 +76,7 @@ class Torneo(db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     tipo = db.Column(db.Enum('Liga', 'Eliminatoria', name='tipo_torneo'), nullable=False)
     fechas = db.Column(db.Date, nullable=True)
+    url_logo = db.Column(db.String(255), nullable=True, default='default_torneo.png')
 
     # Relaciones
     partidos = db.relationship('Partido', backref='torneo', lazy=True)

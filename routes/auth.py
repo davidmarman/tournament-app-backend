@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify, current_app
+from sqlalchemy import or_
 from extensions import db, bcrypt
-from models import Usuario
-from flask_jwt_extended import create_access_token
+from models import Partido, Torneo, Usuario
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 import os
 import time
 from werkzeug.utils import secure_filename
