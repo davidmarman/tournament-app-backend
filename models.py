@@ -40,6 +40,15 @@ class StatsJugador(db.Model):
     faltas = db.Column(db.Integer, default=0)
 
 
+class PartidoEstadistica(db.Model):
+    __tablename__ = 'partido_estadistica'
+    id_stats_partido = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    id_partido = db.Column(db.Integer, db.ForeignKey('partido.id_partido'), nullable=False)
+    id_usuario = db.Column(db.Integer, db.ForeignKey('usuario.id_usuario'), nullable=False)
+    goles = db.Column(db.Integer, default=0)
+    amarillas = db.Column(db.Integer, default=0)
+    rojas = db.Column(db.Integer, default=0)
+
 # =====================================================================
 # 2. TABLAS PRINCIPALES (Entidades base)
 # =====================================================================
@@ -95,6 +104,7 @@ class Partido(db.Model):
     goles_visit = db.Column(db.Integer, default=0)
     fecha = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     estado = db.Column(db.Enum('Pendiente', 'Fin', name='estado_partido'), default='Pendiente', nullable=False)
+    numero_jornada = db.Column(db.Integer, default=1, nullable=False)
 
     # Para poder saber quién es el local y quién el visitante sin confundir a SQLAlchemy
     equipo_local = db.relationship('Equipo', foreign_keys=[id_local])
