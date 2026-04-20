@@ -46,6 +46,10 @@ def create_app():
     from routes.equipos import equipos_bp
     app.register_blueprint(equipos_bp, url_prefix='/api/equipos')
 
+    # Registro del blueprint de torneos
+    from routes.torneos import torneos_bp
+    app.register_blueprint(torneos_bp, url_prefix='/api/torneos')
+
     # Ruta para servir imágenes de perfil
     @app.route('/uploads/perfiles/<filename>')
     def obtener_perfil_image(filename):

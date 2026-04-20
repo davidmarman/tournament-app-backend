@@ -19,11 +19,13 @@ def poblar_base_de_datos():
 
         print(f"✅ Usuario encontrado: {mi_usuario.nombre}")
 
-        # 2. Crear un Torneo (Con su tipo y fecha para evitar errores)
+        # 2. CREAR UN TORNEO
         nuevo_torneo = Torneo(
             nombre="Liga de Campeones Zorin",
-            tipo='Liga',
-            fechas=date.today()
+            tipo="Liga",
+            fechas=datetime(2026, 9, 1),
+            codigo_acceso="ZORIN-2026", # Añadido
+            descripcion="Los partidos de la fase de grupos se jugarán los viernes por la tarde en el Polideportivo Central." # Añadido
         )
         db.session.add(nuevo_torneo)
         db.session.commit() # Guardamos para que se genere su ID

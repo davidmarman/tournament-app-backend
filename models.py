@@ -77,6 +77,8 @@ class Torneo(db.Model):
     tipo = db.Column(db.Enum('Liga', 'Eliminatoria', name='tipo_torneo'), nullable=False)
     fechas = db.Column(db.Date, nullable=True)
     url_logo = db.Column(db.String(255), nullable=True, default='default_torneo.png')
+    codigo_acceso = db.Column(db.String(50), unique=True, nullable=False)
+    descripcion = db.Column(db.Text, nullable=True)
 
     # Relaciones
     partidos = db.relationship('Partido', backref='torneo', lazy=True)

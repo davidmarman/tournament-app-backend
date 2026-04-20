@@ -40,7 +40,7 @@ def register():
         nombre_archivo = f"{int(time.time())}_{nombre_seguro}"
         
         # Guardamos el archivo físico en la carpeta que configuramos en app.py
-        ruta_guardado = os.path.join(current_app.config['UPLOAD_FOLDER'], nombre_archivo)
+        ruta_guardado = os.path.join(current_app.config['UPLOAD_FOLDER_PERFILES'], nombre_archivo)
         imagen.save(ruta_guardado)
 
     # 3. Guardamos en la base de datos (igual que antes)
