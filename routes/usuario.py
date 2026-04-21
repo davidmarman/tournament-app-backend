@@ -1,4 +1,7 @@
-from flask import Blueprint, jsonify
+import uuid
+
+from flask import Blueprint, jsonify, request
+import os
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Usuario, Inscripcion, db 
 
@@ -51,10 +54,52 @@ def get_perfil_completo():
 
     # Retornamos el JSON
     return jsonify({
-        "nombre": f"{u.nombre} {u.apellido}",
-        "username": f"@{u.username}",
+        "nombre": f"{u.nombre}",
+        "apellido": f"{u.apellido}",
+        "username": f"{u.username}",
         "imagen": u.imagen_perfil,
         "equipos": equipos,
         "torneos": torneos,
         "stats": {"goles": goles, "faltas": faltas}
+    }), 200
+
+
+@usuario_bp.route('/editar', methods=['PUT'])
+@jwt_required()
+def editar_perfil():
+    user_id = get_jwt_identity()
+    usuario = Usuario.query.get(user_id)
+    
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    # 1. Obtener datos de texto
+    nombre = request.form.get('nombre')
+    apellido = request.form.get('apellido')
+
+    if nombre: usuario.nombre = nombre
+    if apellido: usuario.apellido = apellido
+
+    # 2. Obtener imagen si existe (Usando tu lógica de UUID)
+    if 'imagen_perfil' in request.files:
+        file = request.files['imagen_perfil']
+        if file and file.filename != '':
+            # Generamos un nombre único
+            ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'png'
+            nuevo_nombre = f"{uuid.uuid4().hex}.{ext}"
+            
+            # Guardamos la imagen físicamente (asegúrate de que la ruta coincida con tu config)
+            filepath = os.path.join('uploads/perfiles', nuevo_nombre)
+            file.save(filepath)
+            usuario.imagen_perfil = nuevo_nombre
+
+    db.session.commit()
+
+    return jsonify({
+        "msg": "Perfil actualizado con éxito",
+        "usuario": {
+            "nombre": usuario.nombre,
+            "apellido": usuario.apellido,
+            "imagen_perfil": usuario.imagen_perfil
+        }
     }), 200
