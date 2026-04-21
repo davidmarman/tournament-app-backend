@@ -183,3 +183,90 @@ def anadir_jugador(id_equipo):
     db.session.commit()
 
     return jsonify({"msg": f"@{username_objetivo} ha sido añadido con éxito"}), 201
+
+# Ruta para que el capitán expulse jugadores de su equipo
+@equipos_bp.route('/<int:id_equipo>/expulsar/<int:id_jugador>', methods=['DELETE'])
+@jwt_required()
+def expulsar_jugador(id_equipo, id_jugador):
+    user_id = int(get_jwt_identity())
+    equipo = Equipo.query.get_or_404(id_equipo)
+    
+    # 1. Seguridad: Solo el capitán puede expulsar
+    if equipo.id_capitan != user_id:
+        return jsonify({"error": "Solo el capitán puede expulsar jugadores"}), 403
+        
+    # 2. Seguridad: No puedes expulsarte a ti mismo (para eso haremos otra ruta)
+    if user_id == id_jugador:
+        return jsonify({"error": "No puedes expulsarte a ti mismo de esta forma."}), 400
+        
+    # 3. Buscar el vínculo y eliminarlo
+    vinculo = Pertenece.query.filter_by(id_equipo=id_equipo, id_usuario=id_jugador).first()
+    if not vinculo:
+        return jsonify({"error": "El jugador no pertenece a este equipo"}), 404
+        
+    db.session.delete(vinculo)
+    db.session.commit()
+    
+    return jsonify({"msg": "Jugador expulsado con éxito"}), 200
+
+
+# 1. SALIR DEL EQUIPO (Jugador Normal)
+@equipos_bp.route('/<int:id_equipo>/salir', methods=['DELETE'])
+@jwt_required()
+def salir_equipo(id_equipo):
+    user_id = int(get_jwt_identity())
+    equipo = Equipo.query.get_or_404(id_equipo)
+    
+    if equipo.id_capitan == user_id:
+        return jsonify({"error": "Como capitán, debes 'Disolver' el equipo, no puedes simplemente salir."}), 400
+        
+    vinculo = Pertenece.query.filter_by(id_equipo=id_equipo, id_usuario=user_id).first()
+    if not vinculo:
+        return jsonify({"error": "No estás en este equipo"}), 404
+        
+    db.session.delete(vinculo)
+    db.session.commit()
+    return jsonify({"msg": "Has salido del equipo correctamente"}), 200
+
+# 2. DISOLVER EQUIPO (Capitán)
+@equipos_bp.route('/<int:id_equipo>/disolver', methods=['DELETE'])
+@jwt_required()
+def disolver_equipo(id_equipo):
+    user_id = int(get_jwt_identity())
+    equipo = Equipo.query.get_or_404(id_equipo)
+    
+    if equipo.id_capitan != user_id:
+        return jsonify({"error": "Solo el capitán puede disolver el equipo"}), 403
+        
+    # Limpiamos primero las tablas hijas para evitar errores SQL
+    Pertenece.query.filter_by(id_equipo=id_equipo).delete()
+    Inscripcion.query.filter_by(id_equipo=id_equipo).delete()
+    
+    db.session.delete(equipo)
+    db.session.commit()
+    return jsonify({"msg": "Equipo disuelto para siempre"}), 200
+
+# 3. EDITAR EQUIPO (Capitán)
+@equipos_bp.route('/<int:id_equipo>/editar', methods=['PUT'])
+@jwt_required()
+def editar_equipo(id_equipo):
+    user_id = int(get_jwt_identity())
+    equipo = Equipo.query.get_or_404(id_equipo)
+    
+    if equipo.id_capitan != user_id:
+        return jsonify({"error": "Solo el capitán puede editar el equipo"}), 403
+
+    nombre = request.form.get('nombre')
+    if nombre: equipo.nombre = nombre
+
+    if 'logo' in request.files:
+        file = request.files['logo']
+        if file and file.filename != '':
+            ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'png'
+            nuevo_nombre = f"{uuid.uuid4().hex}.{ext}"
+            filepath = os.path.join('uploads/equipos', nuevo_nombre)
+            file.save(filepath)
+            equipo.url_logo = nuevo_nombre
+
+    db.session.commit()
+    return jsonify({"msg": "Equipo actualizado correctamente"}), 200

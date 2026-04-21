@@ -37,6 +37,18 @@ def inscribir_equipo():
     # 4. Crear la inscripción
     nueva_inscripcion = Inscripcion(id_equipo=id_equipo, id_torneo=torneo.id_torneo)
     db.session.add(nueva_inscripcion)
+
+    # 5. ¡NUEVO! Añadirlo a la tabla de clasificación con 0 puntos
+    # (Solo si es formato Liga, si en el futuro haces formato "Copa" esto no haría falta)
+    if torneo.tipo == "Liga":
+        nueva_clasif = Clasificacion(
+            id_torneo=torneo.id_torneo,
+            id_equipo=id_equipo,
+            puntos=0,
+            pj=0, pg=0, pe=0, pp=0
+        )
+        db.session.add(nueva_clasif)
+
     db.session.commit()
 
     return jsonify({"msg": f"¡{equipo.nombre} ha sido inscrito en {torneo.nombre} con éxito!"}), 201

@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Partido, Pertenece, db
@@ -21,7 +23,12 @@ def get_mis_proximos_partidos():
 
     # 3. Filtramos los partidos:
     # El equipo local debe estar en 'ids_mis_equipos' O el visitante debe estar en 'ids_mis_equipos'
+    hoy = datetime.now()
+    dentro_de_30_dias = hoy + timedelta(days=30)
     partidos = Partido.query.filter(
+        Partido.estado == 'Pendiente',
+        Partido.fecha >= hoy,
+        Partido.fecha <= dentro_de_30_dias,
         or_(
             Partido.id_local.in_(ids_mis_equipos),
             Partido.id_visitante.in_(ids_mis_equipos)
@@ -32,10 +39,16 @@ def get_mis_proximos_partidos():
     resultado = []
     for p in partidos:
         resultado.append({
-            "equipoLocal": p.equipo_local.nombre,
-            "equipoVisitante": p.equipo_visitante.nombre,
-            "nombreTorneo": p.torneo.nombre,
-            "fecha": p.fecha.strftime("%d/%m %H:%M")
+            "id_partido": p.id_partido,
+            "equipo_local": p.equipo_local.nombre,
+            "logo_local": p.equipo_local.url_logo if p.equipo_local.url_logo else "default_team.png",
+            "equipo_visitante": p.equipo_visitante.nombre,
+            "logo_visitante": p.equipo_visitante.url_logo if p.equipo_visitante.url_logo else "default_team.png",
+            "goles_local": p.goles_local,
+            "goles_visit": p.goles_visit,
+            "estado": p.estado,
+            "fecha": p.fecha.strftime("%d/%m/%Y %H:%M") if p.fecha else "Sin fecha",
+            "nombre_torneo": p.torneo.nombre
         })
 
     return jsonify(resultado), 200

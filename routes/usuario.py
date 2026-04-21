@@ -7,11 +7,17 @@ from models import Usuario, Inscripcion, db
 
 usuario_bp = Blueprint('usuario', __name__)
 
-@usuario_bp.route('/perfil', methods=['GET'])
+@usuario_bp.route('/perfil', defaults={'user_id': None}, methods=['GET'])
+@usuario_bp.route('/perfil/<int:user_id>', methods=['GET'])
 @jwt_required()
-def get_perfil_completo():
-    user_id = get_jwt_identity()
-    u = Usuario.query.get(user_id)
+def get_perfil_completo(user_id):
+    if user_id is None:
+        identity = get_jwt_identity()
+        current_user_id = int(identity)
+    else:
+        current_user_id = user_id
+
+    u = Usuario.query.get(current_user_id)
     
     if not u:
         return jsonify({"error": "Usuario no encontrado"}), 404
@@ -54,6 +60,7 @@ def get_perfil_completo():
 
     # Retornamos el JSON
     return jsonify({
+        "id": u.id_usuario,
         "nombre": f"{u.nombre}",
         "apellido": f"{u.apellido}",
         "username": f"{u.username}",
