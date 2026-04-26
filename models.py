@@ -39,7 +39,6 @@ class StatsJugador(db.Model):
     goles = db.Column(db.Integer, default=0)
     faltas = db.Column(db.Integer, default=0)
 
-
 class PartidoEstadistica(db.Model):
     __tablename__ = 'partido_estadistica'
     id_stats_partido = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -48,6 +47,13 @@ class PartidoEstadistica(db.Model):
     goles = db.Column(db.Integer, default=0)
     amarillas = db.Column(db.Integer, default=0)
     rojas = db.Column(db.Integer, default=0)
+
+# ¡NUEVA TABLA! Para los administradores de los torneos
+class Administra(db.Model):
+    __tablename__ = 'administra'
+    id_usuario = db.Column(db.Integer, db.ForeignKey('usuario.id_usuario'), primary_key=True)
+    id_torneo = db.Column(db.Integer, db.ForeignKey('torneo.id_torneo'), primary_key=True)
+    fecha_asignacion = db.Column(db.DateTime, default=datetime.utcnow)
 
 # =====================================================================
 # 2. TABLAS PRINCIPALES (Entidades base)
@@ -64,9 +70,10 @@ class Usuario(db.Model):
     rol = db.Column(db.Enum('Admin', 'User', name='rol_types'), default='User', nullable=False)
     imagen_perfil = db.Column(db.String(255), nullable=True, default='default.png')
 
-    # Relaciones para acceder fácilmente a sus datos desde Python
+    # Relaciones
     equipos = db.relationship('Pertenece', backref='usuario', lazy=True)
     estadisticas = db.relationship('StatsJugador', backref='usuario', lazy=True)
+    torneos_administrados = db.relationship('Administra', backref='usuario', lazy=True)
 
 class Equipo(db.Model):
     __tablename__ = 'equipo'
@@ -84,15 +91,20 @@ class Torneo(db.Model):
     id_torneo = db.Column(db.Integer, primary_key=True, autoincrement=True)
     nombre = db.Column(db.String(100), nullable=False)
     tipo = db.Column(db.Enum('Liga', 'Eliminatoria', name='tipo_torneo'), nullable=False)
-    fechas = db.Column(db.Date, nullable=True)
     url_logo = db.Column(db.String(255), nullable=True, default='default_torneo.png')
     codigo_acceso = db.Column(db.String(50), unique=True, nullable=False)
     descripcion = db.Column(db.Text, nullable=True)
+    
+    # ¡MODIFICADO! Para soportar franjas múltiples
+    fecha_inicio = db.Column(db.Date, nullable=True)
+    dias_juego = db.Column(db.String(100), nullable=True) # Ej: "Sabado,Domingo"
+    horarios_juego = db.Column(db.Text, nullable=True)    # Ej: "16:00-17:00,17:00-18:00,20:00-21:00"
 
     # Relaciones
     partidos = db.relationship('Partido', backref='torneo', lazy=True)
     clasificaciones = db.relationship('Clasificacion', backref='torneo', lazy=True)
     estadisticas_jugadores = db.relationship('StatsJugador', backref='torneo', lazy=True)
+    administradores = db.relationship('Administra', backref='torneo', lazy=True)
 
 class Partido(db.Model):
     __tablename__ = 'partido'
@@ -103,9 +115,10 @@ class Partido(db.Model):
     goles_local = db.Column(db.Integer, default=0)
     goles_visit = db.Column(db.Integer, default=0)
     fecha = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    estado = db.Column(db.Enum('Pendiente', 'Fin', name='estado_partido'), default='Pendiente', nullable=False)
+    
+    # ¡AÑADIDO "En Juego"!
+    estado = db.Column(db.Enum('Pendiente', 'En Juego', 'Fin', name='estado_partido'), default='Pendiente', nullable=False)
     numero_jornada = db.Column(db.Integer, default=1, nullable=False)
 
-    # Para poder saber quién es el local y quién el visitante sin confundir a SQLAlchemy
     equipo_local = db.relationship('Equipo', foreign_keys=[id_local])
     equipo_visitante = db.relationship('Equipo', foreign_keys=[id_visitante])

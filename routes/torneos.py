@@ -1,6 +1,10 @@
+import datetime
+import os
+import uuid
+
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import Torneo, Equipo, Inscripcion, Usuario, Partido, Clasificacion, db
+from models import Administra, Torneo, Equipo, Inscripcion, Usuario, Partido, Clasificacion, db
 
 torneos_bp = Blueprint('torneos', __name__)
 
@@ -144,3 +148,83 @@ def get_detalle_torneo(id_torneo):
         "jornada_actual": jornada_actual,
         "partidos": lista_partidos
     }), 200
+
+# Ruta para crear Torneos (solo Admin)
+@torneos_bp.route('/crear', methods=['POST'])
+@jwt_required()
+def crear_torneo():
+    user_id = int(get_jwt_identity())
+    
+    # 1. Obtener datos básicos del formulario (Multipart)
+    nombre = request.form.get('nombre')
+    tipo = request.form.get('tipo', 'Liga') # Por defecto 'Liga'
+    descripcion = request.form.get('descripcion', '')
+    
+    # Datos para el calendario dinámico
+    fecha_inicio_str = request.form.get('fecha_inicio')
+    dias_juego = request.form.get('dias_juego') # Ej: "Sabado,Domingo"
+    horarios_juego = request.form.get('horarios_juego') # Ej: "16:00-17:00,18:00-19:00"
+
+    if not nombre:
+        return jsonify({"error": "El nombre del torneo es obligatorio"}), 400
+
+    # 2. Procesar la fecha_inicio (Android nos la mandará en formato YYYY-MM-DD)
+    fecha_inicio = None
+    if fecha_inicio_str:
+        try:
+            fecha_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"error": "Formato de fecha inválido. Usa YYYY-MM-DD"}), 400
+
+    # 3. Generar un código de acceso único (Ej: TRN-8F4A2B)
+    codigo_acceso = f"TRN-{uuid.uuid4().hex[:6].upper()}"
+
+    # 4. Construir el objeto Torneo
+    nuevo_torneo = Torneo(
+        nombre=nombre,
+        tipo=tipo,
+        descripcion=descripcion,
+        codigo_acceso=codigo_acceso,
+        fecha_inicio=fecha_inicio,
+        dias_juego=dias_juego,
+        horarios_juego=horarios_juego
+    )
+
+    # 5. Procesar la subida del Logo (si existe)
+    if 'logo' in request.files:
+        file = request.files['logo']
+        if file and file.filename != '':
+            ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'png'
+            nuevo_nombre_logo = f"{uuid.uuid4().hex}.{ext}"
+            filepath = os.path.join('uploads/torneos', nuevo_nombre_logo)
+            
+            # Asegurarse de que la carpeta uploads/torneos existe
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            file.save(filepath)
+            nuevo_torneo.url_logo = nuevo_nombre_logo
+
+    # 6. Guardar en Base de Datos
+    db.session.add(nuevo_torneo)
+    
+    # MAGIC TRICK: Hacemos un "flush" en lugar de un "commit". 
+    # Esto asigna un ID real (nuevo_torneo.id_torneo) sin cerrar aún la transacción.
+    db.session.flush() 
+
+    # 7. Crear el vínculo como Administrador
+    nuevo_admin = Administra(
+        id_usuario=user_id,
+        id_torneo=nuevo_torneo.id_torneo
+    )
+    db.session.add(nuevo_admin)
+
+    # Ahora sí, guardamos el Torneo y el Admin al mismo tiempo
+    db.session.commit()
+
+    return jsonify({
+        "msg": "Torneo creado con éxito",
+        "torneo": {
+            "id_torneo": nuevo_torneo.id_torneo,
+            "nombre": nuevo_torneo.nombre,
+            "codigo_acceso": nuevo_torneo.codigo_acceso
+        }
+    }), 201
