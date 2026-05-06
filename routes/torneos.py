@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 import os
 import uuid
 
@@ -96,7 +96,8 @@ def get_detalle_torneo(id_torneo):
         "id": torneo.id_torneo,
         "nombre": torneo.nombre,
         "logo": torneo.url_logo if torneo.url_logo else "default_torneo.png",
-        "descripcion": torneo.descripcion or "Sin descripción disponible."
+        "descripcion": torneo.descripcion or "Sin descripción disponible.",
+        "codigo": torneo.codigo_acceso 
     }
 
     # 2. CLASIFICACIÓN (Bloque central)
@@ -172,7 +173,7 @@ def crear_torneo():
     fecha_inicio = None
     if fecha_inicio_str:
         try:
-            fecha_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date()
+            fecha_inicio = dt.datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date()
         except ValueError:
             return jsonify({"error": "Formato de fecha inválido. Usa YYYY-MM-DD"}), 400
 
@@ -228,3 +229,82 @@ def crear_torneo():
             "codigo_acceso": nuevo_torneo.codigo_acceso
         }
     }), 201
+
+@torneos_bp.route('/admin-dashboard', methods=['GET'])
+@jwt_required()
+def get_admin_dashboard():
+    user_id = int(get_jwt_identity())
+    
+    admin_links = Administra.query.filter_by(id_usuario=user_id).all()
+    ids_torneos = [link.id_torneo for link in admin_links]
+
+    torneos_data = []
+    partidos_data = []
+
+    if ids_torneos:
+        torneos = Torneo.query.filter(Torneo.id_torneo.in_(ids_torneos)).all()
+        for t in torneos:
+            torneos_data.append({
+                "id": t.id_torneo,
+                "nombre": t.nombre,
+                "logo": t.url_logo if t.url_logo else "default_torneo.png",
+                "codigo": t.codigo_acceso # El código secreto
+            })
+
+        partidos = Partido.query.filter(
+            Partido.id_torneo.in_(ids_torneos),
+            Partido.estado.in_(['Pendiente', 'En Juego'])
+        ).order_by(Partido.fecha.asc()).limit(15).all()
+
+        for p in partidos:
+            partidos_data.append({
+                "id_partido": p.id_partido,
+                "torneo_nombre": p.torneo.nombre,
+                "equipo_local": p.equipo_local.nombre,
+                "logo_local": p.equipo_local.url_logo if p.equipo_local.url_logo else "default_team.png",
+                "equipo_visitante": p.equipo_visitante.nombre,
+                "logo_visitante": p.equipo_visitante.url_logo if p.equipo_visitante.url_logo else "default_team.png",
+                "fecha": p.fecha.strftime("%d/%m/%Y %H:%M") if p.fecha else "Sin fecha",
+                "estado": p.estado
+            })
+
+    return jsonify({
+        "torneos": torneos_data,
+        "proximos_partidos": partidos_data
+    }), 200
+
+
+@torneos_bp.route('/<int:id_torneo>', methods=['DELETE'])
+@jwt_required()
+def eliminar_torneo(id_torneo):
+    user_id = int(get_jwt_identity())
+    
+    # 1. Verificar que el torneo existe
+    torneo = Torneo.query.get_or_404(id_torneo)
+    
+    # 2. Verificar que el usuario es el administrador de este torneo
+    es_admin = Administra.query.filter_by(id_usuario=user_id, id_torneo=id_torneo).first()
+    if not es_admin:
+        return jsonify({"error": "No tienes permiso para borrar este torneo"}), 403
+
+    # 3. Limpiar datos relacionados (Orden crítico)
+    try:
+        # Borrar registros en Clasificacion
+        Clasificacion.query.filter_by(id_torneo=id_torneo).delete()
+        # Borrar registros en Inscripcion
+        Inscripcion.query.filter_by(id_torneo=id_torneo).delete()
+        # Borrar registros en Partido
+        Partido.query.filter_by(id_torneo=id_torneo).delete()
+        # Borrar el vínculo de administración
+        Administra.query.filter_by(id_torneo=id_torneo).delete()
+        
+        # Por último, borrar el torneo
+        db.session.delete(torneo)
+        db.session.commit()
+        
+        return jsonify({"msg": "Torneo eliminado correctamente"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Error al eliminar: {str(e)}"}), 500
+
+        
