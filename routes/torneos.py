@@ -230,6 +230,8 @@ def crear_torneo():
         }
     }), 201
 
+
+# Ruta para la pantalla de administración del torneo (solo Admin)
 @torneos_bp.route('/admin-dashboard', methods=['GET'])
 @jwt_required()
 def get_admin_dashboard():
@@ -273,7 +275,7 @@ def get_admin_dashboard():
         "proximos_partidos": partidos_data
     }), 200
 
-
+# Ruta para eliminar un torneo (solo Admin)
 @torneos_bp.route('/<int:id_torneo>', methods=['DELETE'])
 @jwt_required()
 def eliminar_torneo(id_torneo):
@@ -307,4 +309,98 @@ def eliminar_torneo(id_torneo):
         db.session.rollback()
         return jsonify({"error": f"Error al eliminar: {str(e)}"}), 500
 
+
+# Ruta para generar el calendario de partidos automáticamente (solo Admin)
+@torneos_bp.route('/<int:id_torneo>/generar-calendario', methods=['POST'])
+@jwt_required()
+def generar_calendario(id_torneo):
+    user_id = int(get_jwt_identity())
+    
+    # 1. Validaciones iniciales
+    torneo = Torneo.query.get_or_404(id_torneo)
+    es_admin = Administra.query.filter_by(id_usuario=user_id, id_torneo=id_torneo).first()
+    
+    if not es_admin:
+        return jsonify({"error": "No tienes permiso para generar el calendario"}), 403
+
+    # Comprobar si ya hay partidos (para no duplicar el calendario por accidente)
+    if Partido.query.filter_by(id_torneo=id_torneo).first():
+        return jsonify({"error": "El calendario ya ha sido generado previamente."}), 400
+
+    # Obtener todos los equipos inscritos
+    inscripciones = Inscripcion.query.filter_by(id_torneo=id_torneo).all()
+    equipos = [ins.equipo for ins in inscripciones]
+
+    if len(equipos) < 2:
+        return jsonify({"error": "Se necesitan al menos 2 equipos inscritos para generar un calendario."}), 400
+
+    # 2. ALGORITMO ROUND-ROBIN (Emparejamientos)
+    if len(equipos) % 2 != 0:
+        equipos.append(None) # Añadimos un "Fantasma" para el equipo que descansa en cada jornada
+
+    n = len(equipos)
+    partidos_generados = []
+
+    # El algoritmo genera (n - 1) jornadas
+    for jornada in range(1, n):
+        for i in range(n // 2):
+            local = equipos[i]
+            visitante = equipos[n - 1 - i]
+            
+            # Si ninguno de los dos es el equipo fantasma, hay partido real
+            if local is not None and visitante is not None:
+                partidos_generados.append({
+                    "jornada": jornada,
+                    "id_local": local.id_equipo,
+                    "id_visitante": visitante.id_equipo
+                })
         
+        # Rotar equipos (El índice 0 se queda fijo, los demás rotan como las agujas del reloj)
+        equipos.insert(1, equipos.pop())
+
+    # 3. ASIGNACIÓN DINÁMICA DE FECHAS Y HORAS
+    # Convertimos el texto "Lunes,Martes" a números que Python entienda (Lunes=0, Domingo=6)
+    dias_map = {"Lunes": 0, "Martes": 1, "Miercoles": 2, "Jueves": 3, "Viernes": 4, "Sabado": 5, "Domingo": 6}
+    dias_permitidos = [dias_map[d.strip()] for d in torneo.dias_juego.split(",") if d.strip() in dias_map]
+    
+    # Lista de horarios ["16:00-17:00", "18:00-19:00"]
+    horarios = [h.strip() for h in torneo.horarios_juego.split(",") if h.strip()]
+    
+    fecha_actual = torneo.fecha_inicio
+    hora_idx = 0
+
+    # Buscar el primer día en el calendario que coincida con los días permitidos
+    while fecha_actual.weekday() not in dias_permitidos:
+        fecha_actual += dt.timedelta(days=1)
+
+    # 4. Guardado en Base de Datos
+    for p_data in partidos_generados:
+        # Extraer la hora de inicio del String (Ej: Coger "16:00" de "16:00-17:00")
+        hora_str = horarios[hora_idx].split("-")[0]
+        hora_obj = dt.datetime.strptime(hora_str, "%H:%M").time()
+        
+        # Combinamos el día actual con la hora exacta
+        fecha_hora_partido = dt.datetime.combine(fecha_actual, hora_obj)
+
+        nuevo_partido = Partido(
+            id_torneo=id_torneo,
+            id_local=p_data["id_local"],
+            id_visitante=p_data["id_visitante"],
+            numero_jornada=p_data["jornada"],
+            fecha=fecha_hora_partido,
+            estado="Pendiente"
+        )
+        db.session.add(nuevo_partido)
+
+        # Avanzamos un hueco horario
+        hora_idx += 1
+        
+        # Si ya hemos llenado todos los horarios de hoy, pasamos al siguiente día válido
+        if hora_idx >= len(horarios):
+            hora_idx = 0
+            fecha_actual += dt.timedelta(days=1)
+            while fecha_actual.weekday() not in dias_permitidos:
+                fecha_actual += dt.timedelta(days=1)
+
+    db.session.commit()
+    return jsonify({"msg": f"¡Calendario generado con éxito! Se crearon {len(partidos_generados)} partidos."}), 201

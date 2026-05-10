@@ -37,7 +37,8 @@ class StatsJugador(db.Model):
     id_usuario = db.Column(db.Integer, db.ForeignKey('usuario.id_usuario'), primary_key=True)
     id_torneo = db.Column(db.Integer, db.ForeignKey('torneo.id_torneo'), primary_key=True)
     goles = db.Column(db.Integer, default=0)
-    faltas = db.Column(db.Integer, default=0)
+    amarillas = db.Column(db.Integer, default=0)
+    rojas = db.Column(db.Integer, default=0)
 
 class PartidoEstadistica(db.Model):
     __tablename__ = 'partido_estadistica'
