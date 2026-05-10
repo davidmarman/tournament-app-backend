@@ -110,9 +110,9 @@ def get_detalle_torneo(id_torneo):
             "id_equipo": equipo.id_equipo,
             "nombre": equipo.nombre,
             "logo": equipo.url_logo if equipo.url_logo else "default_team.png",
-            "pts": c.puntos,
-            "gf": 0, # De momento enviamos 0, lo rellenaremos cuando el Admin suba resultados
-            "gc": 0
+            "pts": (c.puntos or 0),
+            "gf": (c.gf or 0), # De momento enviamos 0, lo rellenaremos cuando el Admin suba resultados
+            "gc": (c.gc or 0)
         })
 
     # 3. PRÓXIMA JORNADA (Bloque inferior)

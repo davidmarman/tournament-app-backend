@@ -31,6 +31,8 @@ class Clasificacion(db.Model):
     pg = db.Column(db.Integer, default=0) # Partidos Ganados
     pe = db.Column(db.Integer, default=0) # Partidos Empatados
     pp = db.Column(db.Integer, default=0) # Partidos Perdidos
+    gf = db.Column(db.Integer, default=0) # Goles a Favor
+    gc = db.Column(db.Integer, default=0) # Goles en Contra
 
 class StatsJugador(db.Model):
     __tablename__ = 'stats_jugador'
