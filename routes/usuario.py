@@ -30,7 +30,8 @@ def get_perfil_completo(user_id):
             equipos.append({
                 "id": vinculo.equipo.id_equipo, 
                 "nombre": vinculo.equipo.nombre, 
-                "logo": vinculo.equipo.url_logo if vinculo.equipo.url_logo else "default_team.png"
+                "logo": vinculo.equipo.url_logo if vinculo.equipo.url_logo else "default_team.png",
+                "idCapitan": vinculo.equipo.id_capitan
             })
             ids_equipos.append(vinculo.equipo.id_equipo)
 
@@ -56,7 +57,8 @@ def get_perfil_completo(user_id):
 
     # 3. Estadísticas
     goles = sum([s.goles for s in u.estadisticas]) if u.estadisticas else 0
-    faltas = sum([s.faltas for s in u.estadisticas]) if u.estadisticas else 0
+    amarillas = sum([s.amarillas for s in u.estadisticas]) if u.estadisticas else 0
+    rojas = sum([s.rojas for s in u.estadisticas]) if u.estadisticas else 0
 
     # Retornamos el JSON
     return jsonify({
@@ -67,7 +69,7 @@ def get_perfil_completo(user_id):
         "imagen": u.imagen_perfil,
         "equipos": equipos,
         "torneos": torneos,
-        "stats": {"goles": goles, "faltas": faltas}
+        "stats": {"goles": goles, "amarillas": amarillas, "rojas": rojas}
     }), 200
 
 
