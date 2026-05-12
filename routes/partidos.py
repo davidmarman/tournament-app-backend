@@ -92,12 +92,14 @@ def get_acta_partido(id_partido):
             "id": partido.id_local,
             "nombre": partido.equipo_local.nombre,
             "logo": partido.equipo_local.url_logo if partido.equipo_local.url_logo else "default_team.png",
+            "capitan": partido.equipo_local.id_capitan,
             "jugadores": jugadores_local
         },
         "equipo_visitante": {
             "id": partido.id_visitante,
             "nombre": partido.equipo_visitante.nombre,
             "logo": partido.equipo_visitante.url_logo if partido.equipo_visitante.url_logo else "default_team.png",
+            "capitan": partido.equipo_visitante.id_capitan,
             "jugadores": jugadores_visitante
         }
     }), 200

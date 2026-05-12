@@ -90,6 +90,7 @@ def get_detalle_equipo(id_equipo):
         "id": equipo.id_equipo,
         "nombre": equipo.nombre,
         "logo": equipo.url_logo if equipo.url_logo else "default_team.png",
+        "id_capitan": equipo.id_capitan,
         "es_capitan": str(equipo.id_capitan) == str(user_id),
         "proximo_partido": info_partido,
         "torneos": lista_torneos,
