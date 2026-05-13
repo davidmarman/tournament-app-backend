@@ -91,67 +91,70 @@ def get_mis_torneos():
 def get_detalle_torneo(id_torneo):
     torneo = Torneo.query.get_or_404(id_torneo)
 
-    # 1. INFO BÁSICA (Cabecera)
-    info_basica = {
-        "id": torneo.id_torneo,
-        "nombre": torneo.nombre,
-        "logo": torneo.url_logo if torneo.url_logo else "default_torneo.png",
-        "descripcion": torneo.descripcion or "Sin descripción disponible.",
-        "codigo": torneo.codigo_acceso ,
-        "estado": torneo.estado
-    }
+    # Miramos si el front nos pide alguna jornada especifica
+    jornada_solicitada = request.args.get('jornada', type=int)
 
-    # 2. CLASIFICACIÓN (Bloque central)
-    clasificaciones = Clasificacion.query.filter_by(id_torneo=id_torneo).order_by(Clasificacion.puntos.desc()).all()
-    lista_clasificacion = []
-    
-    for c in clasificaciones:
-        equipo = c.equipo
-        lista_clasificacion.append({
-            "id_equipo": equipo.id_equipo,
-            "nombre": equipo.nombre,
-            "logo": equipo.url_logo if equipo.url_logo else "default_team.png",
-            "pts": (c.puntos or 0),
-            "gf": (c.gf or 0), # De momento enviamos 0, lo rellenaremos cuando el Admin suba resultados
-            "gc": (c.gc or 0),
-            "pj": (c.pj or 0),
-            "pg": (c.pg or 0),
-            "pe": (c.pe or 0),
-            "pp": (c.pp or 0)
-        })
-
-    # 3. PRÓXIMA JORNADA (Bloque inferior)
-    # Buscamos el primer partido pendiente para saber por qué jornada vamos
+    # Logica para calcular la jornada que toca jugar 
     siguiente_partido = Partido.query.filter_by(
         id_torneo=id_torneo, estado='Pendiente'
     ).order_by(Partido.numero_jornada.asc()).first()
 
-    # Si no hay partidos pendientes, asumimos la jornada 1 o la última jugada
-    jornada_actual = siguiente_partido.numero_jornada if siguiente_partido else 1
+    jornada_que_toca = siqguiente_partido.numero_jornada if siguiente_partido else 1
 
-    partidos_jornada = Partido.query.filter_by(
-        id_torneo=id_torneo, numero_jornada=jornada_actual
+    # Si nos piden una jornada, usamos esa. Si no, la que toca.
+    jornada_a_enviar = jornada_solicitada if jornada_solicitada else jornada_que_toca
+
+    partidos_db = Partido.query.filter_by(
+        id_torneo=id_torneo, numero_jornada=jornada_a_enviar
     ).all()
 
     lista_partidos = []
-    for p in partidos_jornada:
+    for p in partidos_db:
         lista_partidos.append({
             "id_partido": p.id_partido,
             "equipo_local": p.equipo_local.nombre,
-            "logo_local": p.equipo_local.url_logo if p.equipo_local.url_logo else "default_team.png",
+            "logo_local": p.equipo_local.url_logo or "default_team.png",
             "equipo_visitante": p.equipo_visitante.nombre,
-            "logo_visitante": p.equipo_visitante.url_logo if p.equipo_visitante.url_logo else "default_team.png",
+            "logo_visitante": p.equipo_visitante.url_logo or "default_team.png",
             "goles_local": p.goles_local,
             "goles_visit": p.goles_visit,
             "estado": p.estado,
             "fecha": p.fecha.strftime("%d/%m/%Y %H:%M") if p.fecha else "Sin fecha"
         })
 
-    # Ensamblamos y enviamos el JSON gigante
+    # 4. RESPUESTA INTELIGENTE
+    # Si jornada_solicitada existe, es que el usuario está navegando: enviamos SOLO partidos.
+    if jornada_solicitada:
+        return jsonify({
+            "jornada_mostrada": jornada_a_enviar,
+            "partidos": lista_partidos
+        }), 200
+
+    # Si NO hay jornada_solicitada, es la carga inicial: enviamos TODO.
+    # Pero añadimos el campo "max_jornadas" para que Android sepa el límite.
+    max_jornada = db.session.query(db.func.max(Partido.numero_jornada)).filter_by(id_torneo=id_torneo).scalar() or 1
+    
+    clasificaciones = Clasificacion.query.filter_by(id_torneo=id_torneo).order_by(Clasificacion.puntos.desc()).all()
+    lista_clasificacion = [{
+        "id_equipo": c.equipo.id_equipo,
+        "nombre": c.equipo.nombre,
+        "logo": c.equipo.url_logo or "default_team.png",
+        "pts": (c.puntos or 0), "gf": (c.gf or 0), "gc": (c.gc or 0),
+        "pj": (c.pj or 0), "pg": (c.pg or 0), "pe": (c.pe or 0), "pp": (c.pp or 0)
+    } for c in clasificaciones]
+
     return jsonify({
-        "info": info_basica,
+        "info": {
+            "id": torneo.id_torneo,
+            "nombre": torneo.nombre,
+            "logo": torneo.url_logo or "default_torneo.png",
+            "descripcion": torneo.descripcion,
+            "codigo": torneo.codigo_acceso,
+            "estado": torneo.estado
+        },
         "clasificacion": lista_clasificacion,
-        "jornada_actual": jornada_actual,
+        "jornada_actual": jornada_que_toca,
+        "max_jornadas": max_jornada,
         "partidos": lista_partidos
     }), 200
 
