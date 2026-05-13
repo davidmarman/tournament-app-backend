@@ -90,13 +90,14 @@ def get_detalle_equipo(id_equipo):
     lista_palmares = []
     for t in trofeos:
         lista_palmares.append({
-            "torneo": t.torneo.nombre,
-            "tipo": t.tipo_logro,
-            "fecha": t.fecha.strftime("%Y")
+            "id_palmares": t.id_palmares,
+            "torneo_nombre": t.torneo.nombre,
+            "tipo_logro": t.tipo_logro,
+            "fecha_logro": t.fecha_logro.strftime("%Y")
         })
 
 
-    # Ahora actualiza el return para incluir "jugadores"
+    # Devolvemos toda la info para que la muestre en la pantalla de detalles del equipo
     return jsonify({
         "id": equipo.id_equipo,
         "nombre": equipo.nombre,

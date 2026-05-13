@@ -3,7 +3,7 @@ import uuid
 from flask import Blueprint, jsonify, request
 import os
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import Usuario, Inscripcion, db 
+from models import Palmares, Usuario, Inscripcion, db 
 
 usuario_bp = Blueprint('usuario', __name__)
 
@@ -55,6 +55,32 @@ def get_perfil_completo(user_id):
         # Convertimos el diccionario a la lista que Android espera
         torneos = list(torneos_dict.values())
 
+    # Palmares del usuario
+    palmares_lista = []
+
+    # Trofeos individuales
+    logros_ind = Palmares.query.filter_by(id_usuario=current_user_id).all()
+    for p in logros_ind:
+        palmares_lista.append({
+            "id_palmares": p.id_palmares,
+            "tipo_logro": p.tipo_logro,
+            "torneo_nombre": p.torneo.nombre,
+            "fecha_logro": p.fecha_logro.strftime("%Y"),
+            "es_individual": True
+        })
+
+    # Trofeos de sus equipos (Campeón, Subcampeón...)
+    if ids_equipos:
+        logros_eq = Palmares.query.filter(Palmares.id_equipo.in_(ids_equipos)).all()
+        for p in logros_eq:
+            palmares_lista.append({
+                "id_palmares": p.id_palmares,
+                "tipo_logro": p.tipo_logro,
+                "torneo_nombre": f"{p.torneo.nombre} (con {p.equipo.nombre})",
+                "fecha_logro": p.fecha_logro.strftime("%Y"),
+                "es_individual": False
+            })
+
     # 3. Estadísticas
     goles = sum([s.goles for s in u.estadisticas]) if u.estadisticas else 0
     amarillas = sum([s.amarillas for s in u.estadisticas]) if u.estadisticas else 0
@@ -69,6 +95,7 @@ def get_perfil_completo(user_id):
         "imagen": u.imagen_perfil,
         "equipos": equipos,
         "torneos": torneos,
+        "palmares": palmares_lista,
         "stats": {"goles": goles, "amarillas": amarillas, "rojas": rojas}
     }), 200
 
