@@ -283,3 +283,28 @@ def editar_equipo(id_equipo):
 
     db.session.commit()
     return jsonify({"msg": "Equipo actualizado correctamente"}), 200
+
+
+# Ruta para ceder la capitania de un equipo a otro jugador
+@equipos_bp.route('/<int:id_equipo>/ceder-capitania', methods=['POST'])
+@jwt_required()
+def ceder_capitania(id_equipo):
+    user_id = int(get_jwt_identity())
+    data = request.get_json()
+    nuevo_capitan_id = data.get('nuevo_capitan_id')
+
+    equipo = Equipo.query.get_or_404(id_equipo)
+
+    # 1. Seguridad: Solo el capitán actual puede ceder el mando
+    if equipo.id_capitan != user_id:
+        return jsonify({"error": "Solo el capitán puede ceder la capitanía"}), 403
+
+    # 2. Seguridad: El nuevo capitán debe existir y estar en el equipo
+    if not Pertenece.query.filter_by(id_equipo=id_equipo, id_usuario=nuevo_capitan_id).first():
+        return jsonify({"error": "El nuevo capitán debe ser un miembro del equipo"}), 400
+    
+    # 3. Cambiar el mando
+    equipo.id_capitan = nuevo_capitan_id
+    db.session.commit()
+
+    return jsonify({"msg": "Capitanía cedida con éxito"}), 200
