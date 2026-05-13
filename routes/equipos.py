@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import Equipo, Inscripcion, Partido, Pertenece, Torneo, Usuario, db
+from models import Equipo, Inscripcion, Palmares, Partido, Pertenece, Torneo, Usuario, db
 from datetime import datetime
 import os
 import uuid
@@ -85,6 +85,17 @@ def get_detalle_equipo(id_equipo):
                 "logo": jugador.imagen_perfil if jugador.imagen_perfil else "default_profile.png"
             })
 
+    # Buscamos el Palmares de este equipo para mostrar sus logros
+    trofeos = Palmares.query.filter_by(id_equipo=id_equipo).all()
+    lista_palmares = []
+    for t in trofeos:
+        lista_palmares.append({
+            "torneo": t.torneo.nombre,
+            "tipo": t.tipo_logro,
+            "fecha": t.fecha.strftime("%Y")
+        })
+
+
     # Ahora actualiza el return para incluir "jugadores"
     return jsonify({
         "id": equipo.id_equipo,
@@ -95,7 +106,7 @@ def get_detalle_equipo(id_equipo):
         "proximo_partido": info_partido,
         "torneos": lista_torneos,
         "jugadores": lista_jugadores, # ¡NUEVO CAMPO!
-        "palmares": []
+        "palmares": lista_palmares
     }), 200
 
 # Ruta para crear un nuevo equipo (con logo opcional)

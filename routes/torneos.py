@@ -4,7 +4,7 @@ import uuid
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import Administra, Torneo, Equipo, Inscripcion, Usuario, Partido, Clasificacion, db
+from models import Administra, Palmares, StatsJugador, Torneo, Equipo, Inscripcion, Usuario, Partido, Clasificacion, db
 
 torneos_bp = Blueprint('torneos', __name__)
 
@@ -97,7 +97,8 @@ def get_detalle_torneo(id_torneo):
         "nombre": torneo.nombre,
         "logo": torneo.url_logo if torneo.url_logo else "default_torneo.png",
         "descripcion": torneo.descripcion or "Sin descripción disponible.",
-        "codigo": torneo.codigo_acceso 
+        "codigo": torneo.codigo_acceso ,
+        "estado": torneo.estado
     }
 
     # 2. CLASIFICACIÓN (Bloque central)
@@ -408,3 +409,48 @@ def generar_calendario(id_torneo):
 
     db.session.commit()
     return jsonify({"msg": f"¡Calendario generado con éxito! Se crearon {len(partidos_generados)} partidos."}), 201
+
+
+# Ruta para finalizar un torneo y declarar un ganador (solo Admin)
+@torneos_bp.route('/<int:id_torneo>/finalizar', methods=['POST'])
+@jwt_required()
+def finalizar_torneo(id_torneo):
+    # 1. Verificar que el usuario sea Admin (puedes usar tu tabla Administra)
+    torneo = Torneo.query.get_or_404(id_torneo)
+    
+    if torneo.estado == 'Finalizado':
+        return jsonify({"msg": "Este torneo ya está finalizado"}), 400
+
+    # 2. Obtener los 3 mejores de la Clasificación
+    clasif = Clasificacion.query.filter_by(id_torneo=id_torneo).order_by(Clasificacion.puntos.desc(), Clasificacion.gf.desc()).all()
+    
+    logros = []
+    if len(clasif) >= 1:
+        logros.append(Palmares(id_torneo=id_torneo, id_equipo=clasif[0].id_equipo, tipo_logro='Campeon'))
+    if len(clasif) >= 2:
+        logros.append(Palmares(id_torneo=id_torneo, id_equipo=clasif[1].id_equipo, tipo_logro='Subcampeon'))
+    if len(clasif) >= 3:
+        logros.append(Palmares(id_torneo=id_torneo, id_equipo=clasif[2].id_equipo, tipo_logro='Tercero'))
+
+    # 3. Obtener el Pichichi (Máximo goleador)
+    pichichi = StatsJugador.query.filter_by(id_torneo=id_torneo).order_by(StatsJugador.goles.desc()).first()
+    if pichichi and pichichi.goles > 0:
+        logros.append(Palmares(id_torneo=id_torneo, id_usuario=pichichi.id_usuario, tipo_logro='Pichichi', valor_stats=pichichi.goles))
+
+    # Obtenemos el jugador con mas amarillas
+    mas_amarillas = StatsJugador.query.filter_by(id_torneo=id_torneo).order_by(StatsJugador.amarillas.desc()).first()
+    if mas_amarillas and mas_amarillas.amarillas > 0:
+        logros.append(Palmares(id_torneo=id_torneo, id_usuario=mas_amarillas.id_usuario, tipo_logro='Más Amarillas', valor_stats=mas_amarillas.amarillas))
+
+    # Obtenemos el jugador con mas rojas
+    mas_rojas = StatsJugador.query.filter_by(id_torneo=id_torneo).order_by(StatsJugador.rojas.desc()).first()
+    if mas_rojas and mas_rojas.rojas > 0:
+        logros.append(Palmares(id_torneo=id_torneo, id_usuario=mas_rojas.id_usuario, tipo_logro='Más Rojas', valor_stats=mas_rojas.rojas))
+
+    # 4. Guardar todo y cerrar torneo
+    torneo.estado = 'Finalizado'
+    for logro in logros:
+        db.session.add(logro)
+    
+    db.session.commit()
+    return jsonify({"msg": "Torneo finalizado con éxito y palmarés generado"}), 200

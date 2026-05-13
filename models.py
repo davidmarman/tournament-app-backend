@@ -102,6 +102,7 @@ class Torneo(db.Model):
     fecha_inicio = db.Column(db.Date, nullable=True)
     dias_juego = db.Column(db.String(100), nullable=True) # Ej: "Sabado,Domingo"
     horarios_juego = db.Column(db.Text, nullable=True)    # Ej: "16:00-17:00,17:00-18:00,20:00-21:00"
+    estado = db.Column(db.Enum('Inscripcion', 'En Curso', 'Finalizado', name='estado_torneo'), default='Inscripcione', nullable=False)
 
     # Relaciones
     partidos = db.relationship('Partido', backref='torneo', lazy=True)
@@ -125,3 +126,19 @@ class Partido(db.Model):
 
     equipo_local = db.relationship('Equipo', foreign_keys=[id_local])
     equipo_visitante = db.relationship('Equipo', foreign_keys=[id_visitante])
+
+class Palmares(db.Model):
+    __tablename__ = 'palmares'
+    id_palmares = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    id_torneo = db.Column(db.Integer, db.ForeignKey('torneo.id_torneo'), nullable=False)
+    id_equipo = db.Column(db.Integer, db.ForeignKey('equipo.id_equipo'), nullable=True) # Para trofeos de equipo
+    id_usuario = db.Column(db.Integer, db.ForeignKey('usuario.id_usuario'), nullable=True) # Para trofeos individuales (Pichichi)
+    
+    tipo_logro = db.Column(db.String(50), nullable=False) # 'Campeon', 'Subcampeon', 'Tercero', 'Pichichi'
+    valor_stats = db.Column(db.Integer, default=0) # Por si queremos guardar cuántos goles hizo el Pichichi
+    fecha_logro = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relaciones para consulta rápida
+    torneo = db.relationship('Torneo', backref=db.backref('palmares_registros', lazy=True))
+    equipo = db.relationship('Equipo', backref=db.backref('vitrina', lazy=True))
+    usuario = db.relationship('Usuario', backref=db.backref('medallas', lazy=True))
