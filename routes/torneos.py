@@ -99,7 +99,7 @@ def get_detalle_torneo(id_torneo):
         id_torneo=id_torneo, estado='Pendiente'
     ).order_by(Partido.numero_jornada.asc()).first()
 
-    jornada_que_toca = siqguiente_partido.numero_jornada if siguiente_partido else 1
+    jornada_que_toca = siguiente_partido.numero_jornada if siguiente_partido else 1
 
     # Si nos piden una jornada, usamos esa. Si no, la que toca.
     jornada_a_enviar = jornada_solicitada if jornada_solicitada else jornada_que_toca
