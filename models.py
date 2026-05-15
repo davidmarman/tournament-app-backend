@@ -102,7 +102,7 @@ class Torneo(db.Model):
     fecha_inicio = db.Column(db.Date, nullable=True)
     dias_juego = db.Column(db.String(100), nullable=True) # Ej: "Sabado,Domingo"
     horarios_juego = db.Column(db.Text, nullable=True)    # Ej: "16:00-17:00,17:00-18:00,20:00-21:00"
-    estado = db.Column(db.Enum('Inscripcion', 'En Curso', 'Finalizado', name='estado_torneo'), default='Inscripcione', nullable=False)
+    estado = db.Column(db.Enum('Inscripcion', 'En Curso', 'Finalizado', name='estado_torneo'), default='Inscripcion', nullable=False)
 
     # Relaciones
     partidos = db.relationship('Partido', backref='torneo', lazy=True)
