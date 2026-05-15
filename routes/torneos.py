@@ -55,3 +55,10 @@ def generar_calendario(id_torneo):
 @jwt_required()
 def finalizar_torneo(id_torneo):
     return TorneosController.finalizar(id_torneo, int(get_jwt_identity()))
+
+
+# Ruta para añadir Administradores a un torneo (solo Admin)
+@torneos_bp.route('/<int:id_torneo>/anadir-admin', methods=['POST'])
+@jwt_required()
+def anadir_admin_torneo(id_torneo):
+    return TorneosController.anadir_admin(id_torneo, int(get_jwt_identity()))

@@ -1,5 +1,5 @@
 from flask import jsonify, request
-from models import Torneo, Clasificacion, db, Equipo, Administra, Partido
+from models import Torneo, Clasificacion, Usuario, db, Equipo, Administra, Partido
 from services.torneo_service import TorneoService
 import datetime as dt
 
@@ -83,6 +83,8 @@ class TorneosController:
         data = request.form.to_dict()
         if data.get('fecha_inicio'):
             data['fecha_inicio'] = dt.datetime.strptime(data['fecha_inicio'], "%Y-%m-%d").date()
+        else:
+            return jsonify({"error": "Fecha de inicio obligatoria"}), 400
 
         logo = request.files.get('logo')
         nuevo_t = TorneoService.crear_torneo_base(data, user_id, logo)
@@ -154,3 +156,47 @@ class TorneosController:
         TorneoService.finalizar_y_repartir_premios(id_torneo)
         db.session.commit()
         return jsonify({"msg": "Torneo cerrado y palmarés generado"}), 200
+    
+    @staticmethod
+    def anadir_admin(id_torneo, solicitante_id):
+        data = request.get_json()
+        username_objetivo = data.get('username')
+        
+        # 1. ¿El que pide añadir es admin de ESTE torneo?
+        es_admin_actual = Administra.query.filter_by(
+            id_usuario=solicitante_id, 
+            id_torneo=id_torneo
+        ).first()
+        
+        if not es_admin_actual:
+            return jsonify({"error": "No tienes permisos para gestionar administradores"}), 403
+
+        # 2. ¿Existe el usuario objetivo?
+        usuario_objetivo = Usuario.query.filter_by(username=username_objetivo).first()
+        if not usuario_objetivo:
+            return jsonify({"error": f"El usuario @{username_objetivo} no existe"}), 404
+
+        # 3. CONTROL DE SEGURIDAD: ¿Tiene el rol 'Admin' global?
+        if usuario_objetivo.rol != 'Admin':
+            return jsonify({
+                "error": f"El usuario @{username_objetivo} no tiene privilegios de Administrador global."
+            }), 403
+
+        # 4. ¿Ya es admin de este torneo?
+        ya_es_admin = Administra.query.filter_by(
+            id_usuario=usuario_objetivo.id_usuario, 
+            id_torneo=id_torneo
+        ).first()
+        
+        if ya_es_admin:
+            return jsonify({"error": "Este usuario ya gestiona este torneo"}), 400
+
+        # 5. Todo OK -> Guardamos (Podrías mover esto a un Service si quieres ser 100% purista)
+        nuevo_vinculo = Administra(
+            id_usuario=usuario_objetivo.id_usuario, 
+            id_torneo=id_torneo
+        )
+        db.session.add(nuevo_vinculo)
+        db.session.commit()
+        
+        return jsonify({"msg": f"@{username_objetivo} ahora es co-administrador del torneo"}), 201

@@ -97,12 +97,11 @@ class Torneo(db.Model):
     url_logo = db.Column(db.String(255), nullable=True, default='default_torneo.png')
     codigo_acceso = db.Column(db.String(50), unique=True, nullable=False)
     descripcion = db.Column(db.Text, nullable=True)
-    
-    # ¡MODIFICADO! Para soportar franjas múltiples
     fecha_inicio = db.Column(db.Date, nullable=True)
     dias_juego = db.Column(db.String(100), nullable=True) # Ej: "Sabado,Domingo"
     horarios_juego = db.Column(db.Text, nullable=True)    # Ej: "16:00-17:00,17:00-18:00,20:00-21:00"
     estado = db.Column(db.Enum('Inscripcion', 'En Curso', 'Finalizado', name='estado_torneo'), default='Inscripcion', nullable=False)
+    formato_partidos = db.Column(db.String(50), default = 'Ida')
 
     # Relaciones
     partidos = db.relationship('Partido', backref='torneo', lazy=True)

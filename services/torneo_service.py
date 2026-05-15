@@ -80,7 +80,8 @@ class TorneoService:
             codigo_acceso=codigo,
             fecha_inicio=data.get('fecha_inicio'),
             dias_juego=data.get('dias_juego'),
-            horarios_juego=data.get('horarios_juego')
+            horarios_juego=data.get('horarios_juego'),
+            formato_partidos=data.get('formato_partidos', 'Ida')
         )
 
         if logo_file:
@@ -118,13 +119,23 @@ class TorneoService:
             equipos.append(None)
 
         n = len(equipos)
-        partidos_temp = []
+        partidos_ida = []
         for jornada in range(1, n):
             for i in range(n // 2):
                 local, visitante = equipos[i], equipos[n - 1 - i]
                 if local and visitante:
-                    partidos_temp.append({"jornada": jornada, "id_local": local.id_equipo, "id_visitante": visitante.id_equipo})
+                    partidos_ida.append({"jornada": jornada, "id_local": local.id_equipo, "id_visitante": visitante.id_equipo})
             equipos.insert(1, equipos.pop())
+
+        # Si es Ida y Vuelta, generamos la segunda vuelta
+        partidos_totales = partidos_ida.copy()
+        if torneo.formato_partidos == 'Ida y Vuelta':
+            for p in partidos_ida:
+                partidos_totales.append({
+                    "jornada": p["jornada"] + (n - 1), # Jornadas correlativas
+                    "id_local": p["id_visitante"],    # Invertimos localía
+                    "id_visitante": p["id_local"]
+                })
 
         # 2. Lógica de Fechas y Horas
         dias_map = {"Lunes": 0, "Martes": 1, "Miercoles": 2, "Jueves": 3, "Viernes": 4, "Sabado": 5, "Domingo": 6}
@@ -136,7 +147,7 @@ class TorneoService:
             fecha_actual += dt.timedelta(days=1)
 
         hora_idx = 0
-        for p_data in partidos_temp:
+        for p_data in partidos_totales:
             hora_str = horarios[hora_idx].split("-")[0]
             hora_obj = dt.datetime.strptime(hora_str, "%H:%M").time()
             fecha_hora = dt.datetime.combine(fecha_actual, hora_obj)
@@ -154,7 +165,7 @@ class TorneoService:
                 fecha_actual += dt.timedelta(days=1)
                 while fecha_actual.weekday() not in dias_permitidos:
                     fecha_actual += dt.timedelta(days=1)
-        return len(partidos_temp)
+        return len(partidos_totales)
 
     @staticmethod
     def finalizar_y_repartir_premios(id_torneo):
