@@ -200,3 +200,36 @@ class TorneosController:
         db.session.commit()
         
         return jsonify({"msg": f"@{username_objetivo} ahora es co-administrador del torneo"}), 201
+    
+
+    @staticmethod
+    def quitar_admin(id_torneo, solicitante_id, id_usuario_a_quitar):
+        # Verificar que el que lo solicita es admin de este torneo
+        es_admin_actual = Administra.query.filter_by(id_usuario=solicitante_id, id_torneo=id_torneo).first()
+        if not es_admin_actual:
+            return jsonify({"error": "No tienes permisos para gestionar administradores"}), 403
+
+        # Llamamos al servicio
+        exito, msg = TorneoService.eliminar_administrador(id_torneo, id_usuario_a_quitar)
+        if not exito:
+            return jsonify({"error": msg}), 400
+
+        db.session.commit()
+        return jsonify({"msg": msg}), 200
+
+    @staticmethod
+    def get_administradores(id_torneo):
+        # Buscamos todos los vínculos de este torneo
+        vinculos = Administra.query.filter_by(id_torneo=id_torneo).all()
+        
+        lista_admins = []
+        for v in vinculos:
+            u = v.usuario
+            if u:
+                lista_admins.append({
+                    "id_usuario": u.id_usuario,
+                    "username": f"@{u.username}",
+                    "imagen": u.imagen_perfil or "default.png"
+                })
+                
+        return jsonify(lista_admins), 200

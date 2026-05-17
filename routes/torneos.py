@@ -8,22 +8,29 @@ from models import Administra, Palmares, StatsJugador, Torneo, Equipo, Inscripci
 
 torneos_bp = Blueprint('torneos', __name__)
 
+
+# Ruta para inscribir un equipo a un torneo usando el código de acceso
 @torneos_bp.route('/inscribir', methods=['POST'])
 @jwt_required()
 def inscribir_equipo():
     return TorneosController.inscribir(get_jwt_identity())
 
 
+# Ruta para obtener la lista de torneos a los que está inscrito el usuario
 @torneos_bp.route('/mis-torneos', methods=['GET'])
 @jwt_required()
 def get_mis_torneos():
     return TorneosController.get_mis_torneos(get_jwt_identity())
 
+
+# Ruta para obtener el detalle completo de un torneo, incluyendo clasificación y partidos
 @torneos_bp.route('/<int:id_torneo>/detalle', methods=['GET'])
 @jwt_required()
 def get_detalle_torneo(id_torneo):
     return TorneosController.get_detalle(id_torneo)
 
+
+# Ruta para crear un nuevo torneo (solo Admin)
 @torneos_bp.route('/crear', methods=['POST'])
 @jwt_required()
 def crear_torneo():
@@ -62,3 +69,17 @@ def finalizar_torneo(id_torneo):
 @jwt_required()
 def anadir_admin_torneo(id_torneo):
     return TorneosController.anadir_admin(id_torneo, int(get_jwt_identity()))
+
+
+# Ruta para eliminar Administradores de un torneo (solo Admin)
+@torneos_bp.route('/<int:id_torneo>/eliminar-admin/<int:id_usuario>', methods=['DELETE'])
+@jwt_required()
+def eliminar_admin_torneo(id_torneo, id_usuario):
+    return TorneosController.quitar_admin(id_torneo, int(get_jwt_identity()), id_usuario)
+
+
+# Ruta para obtener la lista de administradores de un torneo
+@torneos_bp.route('/<int:id_torneo>/administradores', methods=['GET'])
+@jwt_required()
+def get_administradores_torneo(id_torneo):
+    return TorneosController.get_administradores(id_torneo)

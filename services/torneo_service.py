@@ -185,3 +185,20 @@ class TorneoService:
             valor = getattr(top, campo) if top else 0
             if top and valor > 0:
                 db.session.add(Palmares(id_torneo=id_torneo, id_usuario=top.id_usuario, tipo_logro=nombre_logro, valor_stats=valor))
+
+    
+    @staticmethod
+    def eliminar_administrador(id_torneo, id_usuario_a_quitar):
+        # 1. Contamos cuántos administradores quedan en este torneo
+        total_admins = Administra.query.filter_by(id_torneo=id_torneo).count()
+        
+        if total_admins <= 1:
+            return False, "No puedes eliminar al administrador. Debe haber al menos un administrador por torneo."
+
+        # 2. Si hay más de uno, buscamos el vínculo y lo borramos
+        vinculo = Administra.query.filter_by(id_torneo=id_torneo, id_usuario=id_usuario_a_quitar).first()
+        if vinculo:
+            db.session.delete(vinculo)
+            return True, "Administrador eliminado correctamente."
+        
+        return False, "El usuario no es administrador de este torneo."
