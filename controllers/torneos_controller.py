@@ -1,5 +1,6 @@
-from flask import jsonify, request
-from models import Torneo, Clasificacion, Usuario, db, Equipo, Administra, Partido
+from flask import jsonify, request, session
+from flask_jwt_extended import get_jwt_identity
+from models import Pertenece, Torneo, Clasificacion, Usuario, db, Equipo, Administra, Partido
 from services.torneo_service import TorneoService
 import datetime as dt
 
@@ -29,14 +30,32 @@ class TorneosController:
         # Carga completa inicial
         max_j = TorneoService.obtener_max_jornada(id_torneo)
         clasif_db = Clasificacion.query.filter_by(id_torneo=id_torneo).order_by(Clasificacion.puntos.desc()).all()
+
+        identity = get_jwt_identity()
         
-        lista_clasif = [{
-            "id_equipo": c.equipo.id_equipo,
-            "nombre": c.equipo.nombre,
-            "logo": c.equipo.url_logo or "default_team.png",
-            "pts": c.puntos or 0, "gf": c.gf or 0, "gc": c.gc or 0,
-            "pj": c.pj or 0, "pg": c.pg or 0, "pe": c.pe or 0, "pp": c.pp or 0
-        } for c in clasif_db]
+        current_user_id = int(identity) if identity is not None else None
+        
+        lista_clasif = []
+
+        for c in clasif_db:
+            
+            # Buscamos si existe la relación en la tabla intermedia 'pertenece'
+            es_mi_equipo = False
+            if current_user_id:
+                pertenece_db = Pertenece.query.filter_by(
+                    id_usuario=current_user_id, 
+                    id_equipo=c.equipo.id_equipo
+                ).first()
+                es_mi_equipo = pertenece_db is not None
+
+            lista_clasif.append({
+                "id_equipo": c.equipo.id_equipo,
+                "nombre": c.equipo.nombre,
+                "logo": c.equipo.url_logo or "default_team.png",
+                "pts": c.puntos or 0, "gf": c.gf or 0, "gc": c.gc or 0,
+                "pj": c.pj or 0, "pg": c.pg or 0, "pe": c.pe or 0, "pp": c.pp or 0,
+                "es_mi_equipo": es_mi_equipo 
+            })
 
         # CÁLCULO DE LÍDERES DEL TORNEO (Desde StatsJugador)
         from models import StatsJugador, Usuario
