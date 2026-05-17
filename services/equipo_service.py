@@ -1,7 +1,7 @@
 import os
 import uuid
 from flask import current_app
-from models import db, Equipo, Pertenece, Partido, Torneo, Inscripcion, Palmares
+from models import Clasificacion, db, Equipo, Pertenece, Partido, Torneo, Inscripcion, Palmares
 
 class EquipoService:
 
@@ -55,9 +55,18 @@ class EquipoService:
         } for t in trofeos]
     
     @staticmethod
-    def guardar_logo_equipo(file):
+    def guardar_logo_equipo(file, archivo_antiguo = None):
         """Genera un nombre único y guarda el archivo del logo."""
         if file and file.filename != '':
+            # ELIMINAR BASURA: Si había un logo anterior que no sea el por defecto, lo borramos del disco
+            if archivo_antiguo and archivo_antiguo != 'default_team.png':
+                ruta_antigua = os.path.join('uploads/equipos', archivo_antiguo)
+                if os.path.exists(ruta_antigua):
+                    try:
+                        os.remove(ruta_antigua)
+                    except Exception as e:
+                        print(f"Error al borrar archivo basura: {e}")
+
             ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'png'
             filename = f"{uuid.uuid4().hex}.{ext}"
             filepath = os.path.join('uploads/equipos', filename)
@@ -79,7 +88,36 @@ class EquipoService:
         return nuevo_equipo
 
     @staticmethod
-    def disolver_equipo_completo(equipo):
-        Pertenece.query.filter_by(id_equipo=equipo.id_equipo).delete()
-        Inscripcion.query.filter_by(id_equipo=equipo.id_equipo).delete()
-        db.session.delete(equipo)
+    def disolver_equipo_completo(equipo):  
+        # 2. Buscamos si el equipo está inscrito en algún torneo activo o en fase de inscripción
+        # Si el torneo NO está 'Finalizado', bloqueamos el borrado radicalmente
+        torneo_activo = db.session.query(Torneo).join(Inscripcion).filter(
+            Inscripcion.id_equipo == equipo.id_equipo,
+            Torneo.estado != 'Finalizado'
+        ).first()
+
+        if torneo_activo:
+            return False, f"No puedes disolver el equipo mientras participe en un torneo activo o en juego: '{torneo_activo.nombre}'"
+
+        # 3. Si el torneo SÍ está finalizado (o no está apuntado a ninguno), pasamos el búnker de seguridad
+        try:
+            # Limpiamos los historiales de clasificación del equipo en torneos ya viejos
+            Clasificacion.query.filter_by(id_equipo=equipo.id_equipo).delete()
+            
+            # Limpiamos las tablas intermedias
+            Pertenece.query.filter_by(id_equipo=equipo.id_equipo).delete()
+            Inscripcion.query.filter_by(id_equipo=equipo.id_equipo).delete()
+            
+            # Eliminamos su logo físico si no es el por defecto
+            if equipo.url_logo and equipo.url_logo != 'default_team.png':
+                ruta_logo = os.path.join('uploads/equipos', equipo.url_logo)
+                if os.path.exists(ruta_logo):
+                    try: os.remove(ruta_logo)
+                    except Exception: pass
+
+            # Por último, borramos el cascarón del equipo
+            db.session.delete(equipo)
+            return True, "Equipo disuelto correctamente"
+            
+        except Exception as e:
+            return False, f"Error al disolver el equipo: {str(e)}"

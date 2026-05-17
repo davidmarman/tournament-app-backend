@@ -12,6 +12,9 @@ class EquiposController:
     @staticmethod
     def get_detalle(id_equipo, user_id):
         equipo = Equipo.query.get_or_404(id_equipo)
+
+        # Comprobamos si es miembro del equipo para mostrar el detalle completo
+        es_miembro = Pertenece.query.filter_by(id_equipo=id_equipo, id_usuario=user_id).first() is not None
         
         # Recopilamos toda la info usando el servicio
         proximo = EquipoService.obtener_proximo_partido(id_equipo)
@@ -26,16 +29,48 @@ class EquiposController:
             "logo": ins.torneo.url_logo or "default_torneo.png"
         } for ins in inscripciones if ins.torneo]
 
+        # 2. CÁLCULO DE LÍDERES INTERNOS DEL EQUIPO
+        from models import PartidoEstadistica, Usuario, db
+        # Sacamos los IDs de los jugadores de la plantilla
+        ids_plantilla = [j['id'] for j in plantilla]
+        
+        lider_goles = {"username": "Ninguno", "goles": 0}
+        lider_amarillas = {"username": "Ninguno", "amarillas": 0}
+        lider_rojas = {"username": "Ninguno", "rojas": 0}
+
+        if ids_plantilla:
+            # Pichichi del equipo
+            top_g = db.session.query(Usuario.username, db.func.sum(PartidoEstadistica.goles).label('total')).\
+                join(PartidoEstadistica).filter(PartidoEstadistica.id_usuario.in_(ids_plantilla)).\
+                group_by(Usuario.id_usuario).order_by(db.text('total DESC')).first()
+            if top_g and top_g.total > 0: lider_goles = {"username": f"@{top_g.username}", "goles": int(top_g.total)}
+
+            # Más amarillas
+            top_a = db.session.query(Usuario.username, db.func.sum(PartidoEstadistica.amarillas).label('total')).\
+                join(PartidoEstadistica).filter(PartidoEstadistica.id_usuario.in_(ids_plantilla)).\
+                group_by(Usuario.id_usuario).order_by(db.text('total DESC')).first()
+            if top_a and top_a.total > 0: lider_amarillas = {"username": f"@{top_a.username}", "amarillas": int(top_a.total)}
+
+            # Más rojas
+            top_r = db.session.query(Usuario.username, db.func.sum(PartidoEstadistica.rojas).label('total')).\
+                join(PartidoEstadistica).filter(PartidoEstadistica.id_usuario.in_(ids_plantilla)).\
+                group_by(Usuario.id_usuario).order_by(db.text('total DESC')).first()
+            if top_r and top_r.total > 0: lider_rojas = {"username": f"@{top_r.username}", "rojas": int(top_r.total)}
+
         return jsonify({
             "id": equipo.id_equipo,
             "nombre": equipo.nombre,
             "logo": equipo.url_logo or "default_team.png",
             "id_capitan": equipo.id_capitan,
             "es_capitan": str(equipo.id_capitan) == str(user_id),
+            "soy_miembro": es_miembro,
             "proximo_partido": proximo,
             "torneos": lista_torneos,
             "jugadores": plantilla,
-            "palmares": palmares
+            "palmares": palmares,
+            "lider_goles": lider_goles, 
+            "lider_amarillas": lider_amarillas, 
+            "lider_rojas": lider_rojas          
         }), 200
 
     @staticmethod
@@ -94,11 +129,21 @@ class EquiposController:
     @staticmethod
     def disolver(id_equipo, capitan_id):
         equipo = Equipo.query.get_or_404(id_equipo)
-        if equipo.id_capitan != capitan_id: return jsonify({"error": "No autorizado"}), 403
         
-        EquipoService.disolver_equipo_completo(equipo)
+        # 1. Verificar que quien lo pide es el capitán
+        if equipo.id_capitan != capitan_id: 
+            return jsonify({"error": "No autorizado"}), 403
+        
+        # 2. Llamamos al servicio para comprobar si está jugando un torneo activo
+        exito, msg = EquipoService.disolver_equipo_completo(equipo)
+        
+        # Si exito es False, el servicio nos devuelve el porqué (ej: "No puedes disolver...")
+        if not exito:
+            return jsonify({"error": msg}), 400
+
+        # Si pasa el filtro del servicio con éxito, guardamos en la BD
         db.session.commit()
-        return jsonify({"msg": "Disuelto"}), 200
+        return jsonify({"msg": msg}), 200
 
     @staticmethod
     def editar(id_equipo, capitan_id):

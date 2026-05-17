@@ -5,6 +5,7 @@ from controllers.torneos_controller import TorneosController
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Administra, Palmares, StatsJugador, Torneo, Equipo, Inscripcion, Usuario, Partido, Clasificacion, db
+from services.torneo_service import TorneoService
 
 torneos_bp = Blueprint('torneos', __name__)
 
@@ -83,3 +84,11 @@ def eliminar_admin_torneo(id_torneo, id_usuario):
 @jwt_required()
 def get_administradores_torneo(id_torneo):
     return TorneosController.get_administradores(id_torneo)
+
+# Ruta para expulsar un equipo de un torneo (solo Admin)
+@torneos_bp.route('/<int:id_torneo>/expulsar-equipo/<int:id_equipo>', methods=['DELETE'])
+@jwt_required()
+def expulsar_equipo_liga(id_torneo, id_equipo):
+    exito, msg = TorneoService.expulsar_equipo_torneo(id_torneo, id_equipo)
+    db.session.commit()
+    return jsonify({"msg": msg}), 200

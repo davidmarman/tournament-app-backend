@@ -38,6 +38,13 @@ class TorneosController:
             "pj": c.pj or 0, "pg": c.pg or 0, "pe": c.pe or 0, "pp": c.pp or 0
         } for c in clasif_db]
 
+        # CÁLCULO DE LÍDERES DEL TORNEO (Desde StatsJugador)
+        from models import StatsJugador, Usuario
+        
+        t_goles = StatsJugador.query.filter_by(id_torneo=id_torneo).order_by(StatsJugador.goles.desc()).first()
+        t_amarillas = StatsJugador.query.filter_by(id_torneo=id_torneo).order_by(StatsJugador.amarillas.desc()).first()
+        t_rojas = StatsJugador.query.filter_by(id_torneo=id_torneo).order_by(StatsJugador.rojas.desc()).first()
+
         return jsonify({
             "info": {
                 "id": torneo.id_torneo,
@@ -50,7 +57,10 @@ class TorneosController:
             "clasificacion": lista_clasif,
             "jornada_actual": jornada_que_toca,
             "max_jornadas": max_j,
-            "partidos": partidos
+            "partidos": partidos,
+            "pichichi_torneo": f"@{t_goles.usuario.username} ({t_goles.goles} G)" if t_goles and t_goles.goles > 0 else "Ninguno",
+            "amarillas_torneo": f"@{t_amarillas.usuario.username} ({t_amarillas.amarillas} 🟨)" if t_amarillas and t_amarillas.amarillas > 0 else "Ninguno",
+            "rojas_torneo": f"@{t_rojas.usuario.username} ({t_rojas.rojas} 🟥)" if t_rojas and t_rojas.rojas > 0 else "Ninguno"
         }), 200
     
 
@@ -117,16 +127,22 @@ class TorneosController:
     @staticmethod
     def eliminar(id_torneo, user_id):
         torneo = Torneo.query.get_or_404(id_torneo)
+        
+        # 1. Verificar si el usuario es administrador de este torneo
         es_admin = Administra.query.filter_by(id_usuario=user_id, id_torneo=id_torneo).first()
-        if not es_admin: return jsonify({"error": "No autorizado"}), 403
+        if not es_admin: 
+            return jsonify({"error": "No autorizado"}), 403
 
-        try:
-            TorneoService.eliminar_torneo_completo(torneo)
-            db.session.commit()
-            return jsonify({"msg": "Eliminado"}), 200
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({"error": str(e)}), 500
+        # 2. Llamamos al servicio y desempaquetamos los dos valores que devuelve
+        exito, msg = TorneoService.eliminar_torneo_completo(torneo)
+        
+        # Si exito es False, significa que el torneo no estaba "Finalizado"
+        if not exito:
+            return jsonify({"error": msg}), 400
+
+        # Si todo ha ido bien, confirmamos los cambios en la base de datos
+        db.session.commit()
+        return jsonify({"msg": msg}), 200
         
     @staticmethod
     def generar_calendario(id_torneo, user_id):

@@ -129,10 +129,11 @@ class Partido(db.Model):
 class Palmares(db.Model):
     __tablename__ = 'palmares'
     id_palmares = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    id_torneo = db.Column(db.Integer, db.ForeignKey('torneo.id_torneo'), nullable=False)
-    id_equipo = db.Column(db.Integer, db.ForeignKey('equipo.id_equipo'), nullable=True) # Para trofeos de equipo
-    id_usuario = db.Column(db.Integer, db.ForeignKey('usuario.id_usuario'), nullable=True) # Para trofeos individuales (Pichichi)
-    
+    id_torneo = db.Column(db.Integer, db.ForeignKey('torneo.id_torneo',ondelete='SET NULL'), nullable=True)
+    id_equipo = db.Column(db.Integer, db.ForeignKey('equipo.id_equipo', ondelete='SET NULL'), nullable=True) # Para trofeos de equipo
+    id_usuario = db.Column(db.Integer, db.ForeignKey('usuario.id_usuario',ondelete='CASCADE'), nullable=True) # Para trofeos individuales (Pichichi)
+    nombre_torneo_historico = db.Column(db.String(150), nullable = False) # Guardamos el nombre del torneo para la posteridad, aunque el torneo se borre o cambie de nombre
+    nombre_equipo_historico = db.Column(db.String(100), nullable=True) # Guardamos el nombre del equipo para la posteridad, aunque el equipo se borre o cambie de nombre
     tipo_logro = db.Column(db.String(50), nullable=False) # 'Campeon', 'Subcampeon', 'Tercero', 'Pichichi'
     valor_stats = db.Column(db.Integer, default=0) # Por si queremos guardar cuántos goles hizo el Pichichi
     fecha_logro = db.Column(db.DateTime, default=datetime.utcnow)

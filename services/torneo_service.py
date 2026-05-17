@@ -102,11 +102,16 @@ class TorneoService:
 
     @staticmethod
     def eliminar_torneo_completo(torneo):
+        if torneo.estado != 'Finalizado':
+            return False, "Solo se pueden eliminar torneos finalizados"
+        
         Clasificacion.query.filter_by(id_torneo=torneo.id_torneo).delete()
         Inscripcion.query.filter_by(id_torneo=torneo.id_torneo).delete()
         Partido.query.filter_by(id_torneo=torneo.id_torneo).delete()
         Administra.query.filter_by(id_torneo=torneo.id_torneo).delete()
+        StatsJugador.query.filter_by(id_torneo=torneo.id_torneo).delete()
         db.session.delete(torneo)
+        return True, "Torneo eliminado correctamente"
 
     @staticmethod
     def generar_calendario_liga(id_torneo):
@@ -176,7 +181,14 @@ class TorneoService:
         clasif = Clasificacion.query.filter_by(id_torneo=id_torneo).order_by(Clasificacion.puntos.desc(), Clasificacion.gf.desc()).all()
         tipos = ['Campeon', 'Subcampeon', 'Tercero']
         for i in range(min(len(clasif), 3)):
-            db.session.add(Palmares(id_torneo=id_torneo, id_equipo=clasif[i].id_equipo, tipo_logro=tipos[i]))
+            eq = clasif[i].equipo
+            db.session.add(Palmares(
+                id_torneo=id_torneo,
+                id_equipo=clasif[i].id_equipo,
+                tipo_logro=tipos[i],
+                nombre_torneo_historico=torneo.nombre,
+                nombre_equipo_historico=eq.nombre if eq else "Equipo Disuelto"
+            ))
 
         # Stats Individuales (Pichichi, Amarillas, Rojas)
         stats_map = {'goles': 'Pichichi', 'amarillas': 'Más Amarillas', 'rojas': 'Más Rojas'}
@@ -184,7 +196,18 @@ class TorneoService:
             top = StatsJugador.query.filter_by(id_torneo=id_torneo).order_by(db.text(f"{campo} DESC")).first()
             valor = getattr(top, campo) if top else 0
             if top and valor > 0:
-                db.session.add(Palmares(id_torneo=id_torneo, id_usuario=top.id_usuario, tipo_logro=nombre_logro, valor_stats=valor))
+                # Buscamos el equipo actual del jugador para guardarlo en el historial
+                vinculo_eq = next((v for v in top.usuario.equipos if v.equipo), None)
+                nombre_eq_hist = vinculo_eq.equipo.nombre if vinculo_eq else "Ninguno"
+                
+                db.session.add(Palmares(
+                    id_torneo=id_torneo,
+                    id_usuario=top.id_usuario,
+                    tipo_logro=nombre_logro,
+                    valor_stats=valor,
+                    nombre_torneo_historico=torneo.nombre,
+                    nombre_equipo_historico=nombre_eq_hist
+                ))
 
     
     @staticmethod
@@ -202,3 +225,38 @@ class TorneoService:
             return True, "Administrador eliminado correctamente."
         
         return False, "El usuario no es administrador de este torneo."
+
+
+    @staticmethod
+    def expulsar_equipo_torneo(id_torneo, id_equipo):
+        """Resuelve el abandono forzado de un equipo otorgando victorias por W.O. (3-0)"""
+        # 1. Eliminar rastro de inscripciones y clasificaciones actuales
+        Inscripcion.query.filter_by(id_torneo=id_torneo, id_equipo=id_equipo).delete()
+        Clasificacion.query.filter_by(id_torneo=id_torneo, id_equipo=id_equipo).delete()
+
+        # 2. Buscar todos los partidos PENDIENTES o EN JUEGO de este equipo en este torneo
+        partidos_pendientes = Partido.query.filter(
+            Partido.id_torneo == id_torneo,
+            Partido.estado.in_(['Pendiente', 'En Juego']),
+            ((Partido.id_local == id_equipo) | (Partido.id_visitante == id_equipo))
+        ).all()
+
+        for p in partidos_pendientes:
+            p.estado = 'Fin'
+            if p.id_local == id_equipo:
+                p.goles_local = 0
+                p.goles_visit = 3 # Victoria reglamentaria para el visitante
+                # Actualizamos la clasificación del rival que sí se presentó
+                clasif_rival = Clasificacion.query.filter_by(id_torneo=id_torneo, id_equipo=p.id_visitante).first()
+            else:
+                p.goles_local = 3 # Victoria reglamentaria para el local
+                p.goles_visit = 0
+                clasif_rival = Clasificacion.query.filter_by(id_torneo=id_torneo, id_equipo=p.id_local).first()
+
+            if clasif_rival:
+                clasif_rival.puntos += 3
+                clasif_rival.pj += 1
+                clasif_rival.pg += 1
+                clasif_rival.gf += 3
+
+        return True, "Equipo expulsado. Sus partidos restantes se han resuelto por 3-0."
